@@ -1,0 +1,197 @@
+---
+title: "Tugas Kasus 1"
+author: "KELOMPOK 8"
+date: "2023-11-03"
+output: html_document
+---
+
+## Anggota Kelompok 8 :
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+# create a data frame
+anggota <- data.frame(NIM = c(121450018, 121450026, 121450075, 121450112),
+                      NAMA = c("Balqis Dwian Fitri Zamzami", "Ericson Chandra Sihombing",
+                               "Veni Zahara Kartika", "Christian Arvianus Nathanael Biran"))
+
+# print the table using kableExtra
+kable(anggota) %>%
+  kable_styling(full_width = FALSE)
+```
+
+source dataset: \<www.bps.go.id\>
+
+## Import Package
+
+```{r}
+library(readxl)
+library(tseries)
+library(forecast)
+library(lmtest)
+library(TSA)
+```
+
+# Input Data
+
+## Load Data
+```{r}
+df <- read_excel("D:/5th/Time Series Analysis/Copy of indo_03_1(1).xls")
+
+tsy <- ts(df$Pengamatan, start = (2008), frequency=12)
+
+tsyN <- as.numeric(tsy)
+tsyN
+```
+
+## Time Series    Plot
+```{r}
+plot.ts(tsy,
+     col = "blue",
+     lwd = 1,
+     type = "o",
+     xlab = "Periode",
+     ylab = "Pengamatan",
+     main = "Time Series Plot Periode 2008 - 2015")
+```
+
+Berdasarkan hasil plot di atas dapat diidentifikasi pola musiman, di mana adanya pola yang sama dalam suatu periode yang tetap (pola berulang setiap lebih kurang setahun) yang panjangnya adalah 12 periode (12 bulan). Untuk kestasioneran data tidak dapat dapat ditentukan hanya dengan Menkalinan plot. Oleh karena itu, perlu dilakukan uji kestasioneran data yang meliputi uji kestasioneran dalam varians, dan juga uji kestasioneran dalam mean. Uji kestasioneran dalam varians dilakukan dengan melihat nilai lambda menggunakan metode Box-Cox transformation. Sedangkan uji kestasioneran data dalam mean dilakukan dengan menggunakan Augmented Dickey Fuller (ADF) test. 
+
+## Plot ACF
+```{r}
+acf(tsyN, main = "Grafik ACF", lag.max=40)
+```
+
+Berdasarkan plot di atas dapat dilihat bahwa koefisien autokorelasi pada lag 12, 24, dan 36 sangat kuat dan beberapa lag lainnya memiliki nilai ACF tinggi.
+
+## Plot PACF
+```{r}
+pacf(tsyN, main = "Grafik PACF", lag.max=40)
+```
+
+##UJI STASIONER TERHADAP VARIANS (BOX.COX)
+```{r}
+lambda=BoxCox.lambda(tsy)
+lambda 
+```
+
+Pada pengujian Box-Cox transformation diperoleh nilai lambda sebesar 0.3, sehingga dapat disimpulkan bahwa data belum stasioner secara varians karena nilai lambda belum mendekati 1, sehingga perlu dilakukan transformasi data yaitu dengan menggunakan metode Box-Cox.
+
+## Transformasi Data
+```{r}
+data = sqrt(tsy)
+
+##UJI STASIONER TERHADAP VARIANS yang sudah ditransformasi(BOX.COX)
+lambda=BoxCox.lambda(data)
+lambda
+```
+
+Pada pengujian Box-Cox transformation diperoleh nilai lambda sebesar 0.81, sehingga dapat disimpulkan bahwa data sudah stasioner secara varians karena nilai lambda sudah mendekati 1. Tahap selanjutnya yaitu uji kestasioneran data dalam mean dan diperoleh hasil bahwa data juga belum stasioner dalam mean. Dapat dilihat pada ACF dan PACF nya, pada pola ACF masih berbentuk seperti musiman. Maka dari itu dilakukan differencing untuk menghilangkan pola musiman.
+
+## UJI STASIONER TERHADAP RATA-RATA (ADF)
+```{r}
+#Uji stasioneritas
+adf.test(data)
+```
+
+```{r}
+plot.ts(data,
+     col = "blue",
+     lwd = 1,
+     type = "o",
+     xlab = "Periode",
+     ylab = "Pengamatan",
+     main = "Time Series Plot Periode 2008 - 2015")
+```
+
+```{r}
+acf(data, main = "Grafik ACF Setelah Transformasi", lag.max=50)
+```
+
+## Differencing Musiman
+```{r}
+datas=diff(data,lag=12,differences = 1)
+```
+
+```{r}
+plot.ts(datas,
+     col = "blue",
+     lwd = 1,
+     type = "o",
+     xlab = "Periode",
+     ylab = "Pengamatan",
+     main = "Time Series Plot Periode 2008 - 2015")
+```
+
+## Identifikasi Model
+```{r}
+acf(datas, main = "Grafik ACF Setelah Differencing", lag.max=50)
+```
+
+```{r}
+pacf(datas, main = "Grafik PACF Setelah Differencing", lag.max=50)
+```
+
+```{r}
+model1=Arima(datas, order=c(1,0,0),seasonal=list(order=c(0,0,1),period=12))
+model2=Arima(datas,  order=c(1,0,0),seasonal=list(order=c(0,1,1),period=12))
+model3=Arima(datas, order=c(1,0,0),seasonal=list(order=c(1,1,1),period=12))
+model4=Arima(datas,  order=c(1,0,0),seasonal=list(order=c(1,0,0),period=12))
+model5=Arima(datas,  order=c(1,0,0),seasonal=list(order=c(0,1,0),period=12))
+```
+
+```{r}
+summary(model5)
+```
+
+## Uji Diagnosa Model
+```{r}
+##UJI ASUMSI RESIDUAL
+#Pengujian Non Autokorelasi
+resY1=residuals(model5)
+wnY=Box.test(resY1, type=c("Ljung-Box"))
+wnY
+```
+memenuhi asumsi non autokorelasi, dikarenakan p-value > 0.05 sehingga H0 diterima. Berdasarkan hasil dari pengujian asumsi residual yaitu white noise dan distribusi normal didapatkan hasil bahwa residual data telah bersifat white noise dan berdistribusi normal.
+
+
+```{r}
+#Pengujian Normalitas
+nY1=length(resY1)
+sdY1=sd(resY1)
+resnY1=rnorm(nY1,0,sdY1)
+ks.test(resY1,resnY1)
+```
+
+memenuhi asumsi kenormalan residual karena p-value > 0.05.
+
+```{r}
+#Pengujian Homoskedastisitas
+Box.test(resY1^2, type=c("Ljung-Box"))
+```
+
+Memenuhi asumsi Homoskedastisitas karena p-value lebih besar dari 0.05.
+Semua uji yang digunakan menunjukkan bahwa p-value > 0.05 sehingga hipotesis
+null bahwa data berdistribusi normal diterima. Maka dapat dikatakan bahwa semua tes menerima data residual berdistribusi normal.
+
+```{r}
+checkresiduals(model5, plot=T)
+```
+
+
+Dari hasil yang dikeluarkan, terlihat bahwa p-value<alpha(0.05) sehingga dapat dikatakan bahwa data tidak saling bebas. Distribusi residual pun menunjukkan bahwa dia menyerupai distribusi normal dan grafik galat bersifat stasioner dengan rataan dan variansi yang konstan. Maka dapat dikatakan bahwa model sudah cocok dan memenuhi syarat.
+
+```{r}
+forecast <- forecast(model5, level = c(95), h = 3)
+forecast
+```
+
+```{r}
+autoplot(forecast, main = 'Hasil Prediksi dari Model')
+```
+
+
+```{r}
+summary(model5)
+```

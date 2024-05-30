@@ -1,0 +1,142 @@
+---
+title: "ADW"
+author: "Kelompok 8"
+date: "2023-11-03"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+Kelompok 8
+
+1. Balqis Dwian Fitri Zamzami_121450018
+
+2. Ericson Chandra Sihombing_121450026
+
+3. Veni Zahara Kartika_121450075
+
+4. Christian Arvianus Nathanael Biran_121450112
+
+```{r}
+library(readxl)
+library(forecast)
+library(tseries)
+library(TTR)
+library(TSA)
+library(EnvStats)
+library(bayesforecast)
+```
+
+
+```{r}
+df <- read_excel(("D:/5th/Time Series Analysis/Copy of indo_03_1(1).xls"))
+head(df)
+```
+
+
+```{r}
+tsy <- ts(df$Pengamatan, start = (2008), frequency=12)
+tsyN <- as.numeric(tsy)
+tsyN
+```
+
+
+```{r}
+plot.ts(tsy,
+     col = "blue",
+     lwd = 1,
+     type = "o",
+     xlab = "Periode",
+     ylab = "Pengamatan",
+     main = "Time Series Plot Periode 2008 - 2015")
+```
+
+Berdasarkan hasil plot di atas dapat diidentifikasi pola musiman, di mana adanya pola yang sama dalam suatu periode yang tetap (pola berulang setiap lebih kurang setahun) yang panjangnya adalah 12 periode (12 bulan). Namun plot tersebut juga menunjukkan bahwa adanya sifat non-stasioneritas dalam variansi
+
+```{r}
+#Uji stasioneritas
+adf.test(tsy)
+adf.test(tsyN)
+```
+
+```{r}
+acf(tsyN, main = "Grafik ACF Tanpa Differencing", lag.max=90)
+```
+
+
+```{r}
+#Cek nilai lambda
+lambda=BoxCox.lambda(tsy)
+lambda
+boxcox(tsyN)
+```
+
+```{r}
+#Transformasi data berdasarkan nilai lambda
+tsyNn= (sqrt(tsy))
+tsyNn
+```
+
+```{r}
+# Cek nilai lambda setelah transformasi
+lambda=BoxCox.lambda(tsyNn)
+lambda
+```
+
+
+```{r}
+# Cek statsioner mean dan varians setelah transformasi
+acf(tsyNn) 
+```
+```{r}
+pacf(tsyNn)
+```
+
+```{r}
+ts.plot(tsyNn)
+```
+
+```{r}
+adf.test(tsyNn)
+```
+
+
+```{r}
+# differencing
+y.dif1 = diff(tsyNn, differences = 1)
+plot.ts(y.dif1, lty=1, xlab="waktu", ylab="Data Y.Diff Ordo 1")
+points(y.dif1)
+```
+```{r}
+adf.test(diff(y.dif1))
+```
+# Auto Sarima
+```{r}
+sarimaAP1 <- auto.sarima(y.dif1, iter = 500, chains = 1)
+sarimaAP1
+```
+
+```{r}
+forecastAP1 <- forecast(sarimaAP1, level = c(95), h = 3)
+forecastAP1
+```
+
+```{r}
+autoplot(forecastAP1, main = 'Hasil Prediksi dari Model')
+```
+
+# Auto Arima
+```{r}
+sarimaAP2 <- auto.arima(y.dif1, trace=TRUE, ic="aic")
+sarimaAP2
+```
+```{r}
+forecastAP2 <- forecast(sarimaAP2, level = c(95), h = 3)
+forecastAP2
+```
+```{r}
+autoplot(forecastAP2, main = 'Hasil Prediksi dari Model')
+```
+
+
+Hasil dari forecesting menggunakan metode auto.sarima pada 3 bulan kedepan yakni bulan Januari, Februari, dan Maret tahun 2016 memiliki nilai inflasi sebesar 0.1853316, 0.1101268, dan 0.1431047. Jika dibandingkan dengan data pada BPS bulan Januari, Februari, dan Maret tahun 2016 yang memiliki nilai inflasi sebesar 0.15, 0.6, dan 0.3 tidak jauh berbeda dengan hasil prediksi menggunakan model Sarima(0,0,1)(0,1,1)[12] sedangkan ketika menggunakan metode auto.arima pada 3 bulan kedepan yakni bulan Januari, Februari, dan Maret tahun 2016 memiliki nilai inflasi sebesar 0.1884044, 0.2014138, dan 0.1756712. Jika dibandingkan dengan data pada BPS bulan Januari, Februari, dan Maret tahun 2016 yang memiliki nilai inflasi sebesar 0.15, 0.6, dan 0.3 tidak jauh berbeda dengan hasil prediksi menggunakan model ARIMA (0,0,2)(0,1,1)[12]. 

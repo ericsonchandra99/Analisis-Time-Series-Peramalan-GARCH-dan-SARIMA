@@ -1,0 +1,368 @@
+---
+title: "Tugas Garch"
+author: "KELOMPOK 8"
+date: "2023-11-24"
+output: html_document
+---
+
+## Anggota Kelompok 8 :
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+# create a data frame
+anggota <- data.frame(NIM = c(121450018, 121450026, 121450075, 121450112),
+                      NAMA = c("Balqis Dwian Fitri Zamzami", "Ericson Chandra Sihombing",
+                               "Veni Zahara Kartika", "Christian Arvianus Nathanael Biran"))
+
+# print the table using kableExtra
+kable(anggota) %>%
+  kable_styling(full_width = FALSE)
+```
+
+source dataset: \<www.bps.go.id\>
+
+## Import Package
+
+```{r}
+library('xts')
+library('zoo')
+library('quantmod')
+library('astsa')
+library('broom')
+library('FinTS')
+library('rugarch')
+library('forecast')
+library('TTR')
+library('TSA')
+library('graphics')
+library('tseries')
+library('forecast')
+library('lmtest')
+library('TSA')
+```
+
+# Input Data
+
+## Load Data
+
+```{r}
+myShare <- "IBM"
+myStartDate <- '2020-01-01'
+myEndDate   <- Sys.Date()
+
+df <- getSymbols(myShare
+                 , from = myStartDate
+                 , to = myEndDate
+                 , warnings = FALSE
+                 , auto.assign = FALSE)
+
+
+df <- data.frame(df)
+
+#Change the names in the data frame
+names(df) <- c('Open', 'High', 'Low', 'Close','Volume','Adjusted')
+
+# Convert the row names to a column
+df$Date <- as.Date(rownames(df))
+```
+
+```{r}
+head(df)
+nrow(df)
+```
+
+## Mengubah data menjadi time series
+
+```{r}
+data <- ts(df$Close)
+str(data)
+```
+
+## Time Series Plot
+
+```{r}
+plot.ts(data,
+     col = "blue",
+     lwd = 1,
+     xlab = "Time",
+     ylab = "Close",
+     main = "Time Series Plot IBM Close 2020 - 2022")
+```
+
+Plot deret waktu tersebut menggambarkan harga dari Harga Saham International Business Machines (IBM) yang menunjukkan harga saham meningkat dari waktu ke waktu meskipun harga menunjukkan volatilitas, sehingga harga saham tidak stasioner dari waktu ke waktu karena perubahan mean dan varians dari waktu ke waktu.
+
+## Cek Kestasioneran terhadap rata-rata (mean)
+
+```{r}
+adf.test(data)
+```
+
+Dari uji ADF yang diperoleh pvalue = 0.01 \< 0.05 yang mana berarti data stasioner. Namun, belum cukup bukti penuh jadi kami akan melihat dari hasil plot ACF apakah benar data sudah stasioner terhadap rata-rata (mean) atau belum.
+
+## Plot ACF
+
+```{r}
+acf(data, main = "Grafik ACF", lag.max=20)
+```
+
+Berdasarkan plot di atas dapat dilihat bahwa plot ACF tersebut menunjukkan pola *tails off* atau pola cenderung menurun secara perlahan. Maka kita perlu melakukan differencing terhadap data.
+
+## Melakukan Differencing
+
+```{r}
+datas = diff(data, differences = 1)
+
+plot.ts(datas,
+     col = "blue",
+     lwd = 1,
+     xlab = "Time",
+     ylab = "Close",
+     main = "Time Series Plot IBM Close Differencing Ordo -1")
+points(datas, col = "blue")
+```
+
+Setelah dilakukan differencing dapat dilihat pada hasil plot sebaran data berada disekitaran 0 yang mana menunjukkan bahwa sudah stastioner yaitu rata-rata (mean) dan varians konstan dari waktu ke waktu. Namun kita tetap perlu memastikan apakah sudah benar stasioner terhadap varians dengan melakukan pengujian Box-Cox.
+
+## Uji Stasioner Terhadap Varians (BOX.COX)
+
+```{r}
+lambda=BoxCox.lambda(datas)
+lambda 
+```
+
+Pada pengujian Box-Cox transformation diperoleh nilai lambda sebesar 0.906, sehingga dapat disimpulkan bahwa data sudah stasioner secara varians karena nilai sudah mendekati 1, sehingga tidak perlu dilakukan transformasi data dan data benar sudah stasioner terhadap rata-rata (mean) dan varians.
+
+## Cek Kestasioneran terhadap rata-rata dari diff 1
+
+```{r}
+adf.test(datas)
+```
+
+Dari uji ADF yang diperoleh setelah melakukan differencing hasilnya pvalue = 0.01 \< 0.05. Tetap sama seperti seblum dilakukan differencing dan data stationer terhadap rata-rata.
+
+## Identifikasi Model
+
+### Plot ACF After Diff 1
+
+```{r}
+acf(datas, main = "Plot ACF After Differencing Ordo -1", lag.max=20)
+```
+
+Ditinjau dari plot acf yang cut off setelah lag pertama menandakan bahwa data benar sudah stasioner.
+
+### Plot PACF After Diff 1
+
+```{r}
+pacf(datas, main = "Plot PACF After Differencing Ordo -1", lag.max=20)
+```
+
+```{r}
+eacf(datas)
+```
+
+## Pemilihan Model Terbaik dengan melihat AIC
+
+```{r}
+model1 <- arima(datas, order = c(1, 0, 1), method = 'ML') # ARMA(1,1)
+model2 <- arima(datas, order = c(1, 0, 0), method = 'ML') # AR(1)
+model3 <- arima(datas, order = c(1, 0, 0), method = 'ML') # AR(1) dengan orde MA(1)
+model4 <- arima(datas, order = c(4, 0, 2), method = 'ML') # ARMA(4,2)
+
+
+AIC = cbind(model1$aic, model2$aic, model3$aic, model4$aic)
+colnames(AIC) = c('ARMA(1,1)','AR(1)', 'AR(1) dengan orde MA(1)', 'ARMA(4,2)')
+AIC
+```
+
+# Menggunakan Auto Arima
+
+```{r}
+best_model <- auto.arima(datas, trace=TRUE)
+best_model
+```
+
+Jika ditinjau berdasarkan nilai komparasi aic yang diperoleh dari fungsi 'arima' dengan metode ML diperoleh model ARMA(4,2) = 4274.261 dengan nilai aic terkecil dibandingkan model lainnya. Untuk itu, dalam memperkuat analisis, digunakan fungsi 'auto.arima' yang menghasilkan model terbaik yaitu ARIMA(0,0,0) = 4298.13. Jika dibandingkan lagi nilai aic dengan metode ML dan auto.arima didapatkan model terbaik terdapat pada model4 yaitu model ARMA(4,2) dengan nilai AIC 4274.261 lebih kecil dibandingkan model lainnya.
+
+## Uji Diagnostik Model
+
+### Asumsi Kenormalan
+
+```{r}
+sisaan <- residuals(model4)
+
+qqnorm(sisaan)
+qqline(sisaan, col='blue')
+```
+
+Berdasarkan pada QQ plot yang diperoleh bahwa residual menyebar mengikuti garis lurus, sehingga dapat dikatakan bahwa residual menyebar normal. memenuhi asumsi kenormalan residual karena p-value \> 0.05.
+
+```{r}
+tsdiag(model4)
+```
+
+```{r}
+checkresiduals(model4)
+```
+
+Dari hasil yang dikeluarkan, terlihat bahwa p-value \> 0.05 sehingga dapat dikatakan bahwa data saling bebas. Distribusi residual pun menunjukkan distribusi normal dan grafik galat bersifat stasioner dengan rataan dan variansi yang konstan. Maka, dapat dikatakan bahwa model sudah cocok dan memenuhi syarat.
+
+### Uji Normalitas Sisaan
+
+$H_0$ : Sisaan mengikuti sebaran normal $H_1$ : Sisaan tidak mengikuti sebaran normal
+
+```{r}
+jarque.bera.test(sisaan)
+shapiro.test(sisaan)
+```
+
+Berdasarkan uji Jarque Bera dan Shapiro-Wilk, keduanya menghasilkan p-value \< 0.05 Tak Tolak $H_0$, yang artinya sisaan tidak mengikuti sebaran normal dalam taraf nyata 5%.
+
+### Uji nilai tengah sisaan
+
+```{r}
+t.test(sisaan, mu = 0, alternative = "two.sided")
+```
+
+$H_0$ : $μ$ = 0 $H_1$ : $μ$ ≠ 0
+
+Diperoleh p−value = 0.9976 \> 0.05 yang berarti TOLAK $H_0$, Nilai tengah sisaan bernilai 0 dalam taraf nyata 5%.
+
+### Uji autokorelasi
+
+```{r}
+Box.test(sisaan, lag = 23 ,type = "Ljung")
+```
+
+$H_0$ : tidak ada autokorelasi $H_1$ : terdapat autokorelasi
+
+Diperoleh p−value = 0.7959 \> 0.05 yang berarti TERIMA $H_0$, memenuhi asumsi non autokorelasi. Berdasarkan hasil dari pengujian asumsi residual yaitu white noise dan distribusi normal didapatkan hasil bahwa residual data telah bersifat white noise dan berdistribusi normal.
+
+Khusus untuk ARCH-LM test: $H_0$ : Data menunjukkan proses tidak bersifat heteroskedastik $H_1$ : Data menunjukkan proses bersifat heteroskedastik
+
+```{r}
+resid2 <- sisaan^2
+plot(resid2, main = "Grafik Galat Kuadrat", type = 'l')
+```
+
+```{r}
+Box.test(resid2, lag = 12)
+```
+
+```{r}
+ArchTest(sisaan)
+```
+
+Dari uji Ljung Box dan Arch test, terlihat bahwa p-value \< α sehingga dapat dikatakan bahwa data residual memiliki efek ARCH.
+
+## Penentuan Model
+
+```{r}
+acf(resid2, main = 'ACF Residu Kuadrat', lag.max = 20)
+```
+
+```{r}
+pacf(resid2, main = 'PACF Residu Kuadrat', lag.max = 20)
+```
+
+Terlihat bahwa grafik ACF cut-off pada lag ke-5 dan PACF cut-off pada lag ke-6. Maka diperoleh model yang cocok adalah sebagai berikut:
+
+1.  GARCH(1,1) (Dipilih karena parsimoni)
+2.  GARCH(5,6)
+
+## Model GARCH
+
+Proses Generalized Autoregressive Conditional Heteroskedasticity (GARCH) adalah istilah ekonometrik yang dikembangkan pada tahun 1982 oleh Robert F. Engle. Proses GARCH menggambarkan sebuah pendekatan untuk memperkirakan volatilitas di pasar keuangan. Proses GARCH memberikan pandangan yang lebih nyata dalam memprediksi return instrumen keuangan dibandingkan model lainnya.
+
+```{r}
+# GARCH (1,1) with std
+g1 <- ugarchspec(mean.model = list(armaOrder=c(4,2)),variance.model = list(model = 'eGARCH', 
+                          garchOrder = c(1, 1)),distribution = 'std')
+
+fit_g1 <- ugarchfit(spec = g1, data = datas, out.sample = 100)
+fit_g1
+```
+
+```{r}
+plot(fit_g1,which='all')
+```
+
+Terlihat pada uji dignostik model pada plot QQ-norm terlihat bahwa sebaran residual mengikuti garis lurus sehingga dapat disimpulkan bahwa residual menyebar normal. Lalu, diperkuat dengan nilai p-value pada uji L-jung Box yang lebih besar dari α = 0.05.
+
+## Peramalan dengan Model ARMA(4,2)-GARCH(1,1) with distribution std
+
+```{r}
+forc = ugarchforecast(fit_g1, data = datas, n.ahead = 10, n.roll = 10)
+print(forc)
+```
+
+```{r}
+plot(forc, which= "all")
+```
+
+Pada hasil ramalan untuk data saham IBM untuk ke 10 waktu kedepan dapat dilihat pada plot diatas menunjukkan bahwa hasil ramalan bernilai sama sehingga membentuk garis lurus.
+
+```{r}
+# GARCH (1,1) with norm
+g11 <- ugarchspec(mean.model = list(armaOrder=c(4,2)),variance.model = list(model = 'eGARCH', 
+                          garchOrder = c(1, 1)),distribution.model="norm")
+
+fit_g11 <- ugarchfit(spec = g11, data = datas, out.sample = 100)
+fit_g11
+```
+
+```{r}
+plot(fit_g11,which='all')
+```
+
+## Peramalan dengan Model ARMA(4,2)-GARCH(1,1) with distribution normal
+
+```{r}
+forc11 = ugarchforecast(fit_g11, data = datas, n.ahead = 10, n.roll = 10)
+print(forc11)
+```
+
+```{r}
+plot(forc11, which= "all")
+```
+
+Pada hasil ramalan untuk data saham IBM untuk ke 10 waktu kedepan dapat dilihat pada plot diatas menunjukkan bahwa hasil ramalan bernilai sama sehingga membentuk garis lurus.
+
+```{r}
+# GARCH (5,6) with std
+g2 <- ugarchspec(mean.model = list(armaOrder=c(4,2)),variance.model = list(model = 'eGARCH', 
+                          garchOrder = c(5, 6)),distribution = 'std')
+
+fit_g2 <- ugarchfit(spec = g2, data = datas, out.sample = 100)
+fit_g2
+```
+
+```{r}
+plot(fit_g2,which='all')
+```
+
+Terlihat pada uji dignostik model pada plot QQ-norm terlihat bahwa sebaran residual mengikuti garis lurus sehingga dapat disimpulkan bahwa residual menyebar normal. Lalu, diperkuat dengan nilai p-value pada uji L-jung Box yang lebih besar dari α = 0.05.
+
+## Peramalan dengan Model ARMA(4,2)-GARCH(5,6) with distribution std
+
+```{r}
+forc = ugarchforecast(fit_g2, data = datas, n.ahead = 10, n.roll = 10)
+print(forc)
+```
+
+```{r}
+plot(forc, which= "all")
+```
+
+## Kesimpulan
+
+Karena dengan jika menggunakan model ARCH masih signifikan. Maka dari itu, dicobakan pada beberapa model GARCH dan dibandingkan nilai-nilai seperti AIC dan signifikansi parameter, maka akan digunakan model GARCH(5,6) yang memiliki nilai AIC kecil dan parameter yang hampir semua signifikan. Sehingga diperoleh model Mean yaitu ARMA(4,2) dan model Varian yaitu GARCH(5,6).
+
+Dengan persamaan sebagai berikut :
+
+*Varian Model GARCH(5,6)* :
+
+ada di ppt
+
+Terlihat bahwa forecast dari model GARCH(5,6) mengikuti pola dari data yang ada. Maka, model cocok digunakan untuk memodelkan variansi/risiko di masa depan.
