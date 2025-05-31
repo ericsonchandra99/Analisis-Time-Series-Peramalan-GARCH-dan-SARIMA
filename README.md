@@ -55,17 +55,14 @@ Metode yang digunakan meliputi uji kestasioneran, transformasi Box-Cox, identifi
 
 ---
 
+---
 ## 📚 Referensi
 
 - Engle, R. (1982). Autoregressive Conditional Heteroskedasticity. Econometrica.  
 - Hyndman, R. J., & Athanasopoulos, G. (2018). Forecasting: Principles and Practice.  
-- Badan Pusat Statistik Indonesia - [bps.go.id](https://www.bps.go.id)  
-
+- Badan Pusat Statistik Indonesia - [bps.go.id](https://www.bps.go.id)
+-   
 ---
-
-## 🤝 Kontribusi
-
-Kami terbuka untuk kontribusi! Silakan fork repository dan kirim pull request untuk perbaikan atau fitur tambahan.
 
 ---
 
